@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Study Room Scheduler</title>
+<style>
+  /* ── Reset & Base ────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: #f0f2f5; color: #1a1a2e; min-height: 100vh; display: flex;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ── Sidebar ─────────────────────────────────────── */
+  .sidebar {
+    width: 220px; background: #1a1a2e; color: #fff; display: flex;
+    flex-direction: column; padding: 0; position: fixed; top: 0; left: 0;
+    height: 100vh; z-index: 100;
+  }
+  .sidebar-header {
+    padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .sidebar-header h1 { font-size: 16px; font-weight: 700; letter-spacing: .5px; }
+  .sidebar-header p { font-size: 11px; color: rgba(255,255,255,.5); margin-top: 4px; }
+  .nav { flex: 1; padding: 12px 0; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+    cursor: pointer; font-size: 14px; color: rgba(255,255,255,.6);
+    transition: all .15s; border-left: 3px solid transparent;
+  }
+  .nav-item:hover { color: #fff; background: rgba(255,255,255,.05); }
+  .nav-item.active { color: #fff; background: rgba(255,255,255,.08); border-left-color: #4f8cff; }
+  .nav-icon { width: 20px; text-align: center; font-size: 16px; }
+  .sidebar-footer {
+    padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.08);
+    font-size: 11px; color: rgba(255,255,255,.3);
+  }
+
+  /* ── Main Content ────────────────────────────────── */
+  .main { margin-left: 220px; flex: 1; padding: 32px; max-height: 100vh; overflow-y: auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .page-subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+
+  /* ── Cards ───────────────────────────────────────── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .stat-card {
+    background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    transition: transform .15s;
+  }
+  .stat-card:hover { transform: translateY(-2px); }
+  .stat-card .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: .5px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; margin: 6px 0 2px; }
+  .stat-card .sub { font-size: 12px; color: #888; }
+  .stat-card .icon { font-size: 24px; margin-bottom: 8px; }
+
+  /* ── Seat Map ────────────────────────────────────── */
+  .area-section { margin-bottom: 28px; }
+  .area-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .area-header h3 { font-size: 16px; font-weight: 600; }
+  .area-header .area-util { font-size: 12px; color: #888; }
+  .seat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+  .seat-card {
+    background: #fff; border-radius: 10px; padding: 14px 10px; text-align: center;
+    cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: all .15s;
+    border: 2px solid transparent; position: relative;
+  }
+  .seat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+  .seat-card .seat-id { font-size: 14px; font-weight: 600; }
+  .seat-card .seat-status { font-size: 10px; margin-top: 4px; padding: 2px 8px; border-radius: 10px; display: inline-block; }
+  .seat-card .seat-features { font-size: 10px; color: #888; margin-top: 4px; }
+  .seat-card.status-available { border-color: #22c55e; }
+  .seat-card.status-available .seat-status { background: #dcfce7; color: #15803d; }
+  .seat-card.status-occupied { border-color: #ef4444; cursor: default; }
+  .seat-card.status-occupied .seat-status { background: #fce4ec; color: #c62828; }
+  .seat-card.status-reserved { border-color: #f59e0b; }
+  .seat-card.status-reserved .seat-status { background: #fef3c7; color: #92400e; }
+  .seat-card.status-maintenance { border-color: #9ca3af; cursor: default; opacity: .6; }
+  .seat-card.status-maintenance .seat-status { background: #f3f4f6; color: #6b7280; }
+  .seat-card.selected { border-color: #4f8cff; box-shadow: 0 0 0 3px rgba(79,140,255,.2); }
+
+  /* ── Area tag colors ─────────────────────────────── */
+  .area-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+  .area-A { background: #e0f2fe; color: #0369a1; }
+  .area-B { background: #f0fdf4; color: #15803d; }
+  .area-C { background: #fefce8; color: #a16207; }
+
+  /* ── Reservation Form ────────────────────────────── */
+  .form-card {
+    background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    max-width: 640px;
+  }
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #333; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px;
+    font-size: 14px; font-family: inherit; transition: border-color .15s; background: #fff;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: #4f8cff; box-shadow: 0 0 0 3px rgba(79,140,255,.1);
+  }
+  .form-group textarea { min-height: 80px; resize: vertical; }
+  .form-group .hint { font-size: 11px; color: #888; margin-top: 4px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .btn {
+    padding: 10px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary { background: #4f8cff; color: #fff; }
+  .btn-primary:hover { background: #3b78f0; }
+  .btn-primary:disabled { background: #93b5ff; cursor: not-allowed; }
+  .btn-secondary { background: #f3f4f6; color: #333; }
+  .btn-secondary:hover { background: #e5e7eb; }
+  .btn-danger { background: #ef4444; color: #fff; }
+  .btn-danger:hover { background: #dc2626; }
+
+  /* ── Result Panel ────────────────────────────────── */
+  .result-panel {
+    background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    margin-top: 20px; max-width: 640px; display: none;
+  }
+  .result-panel.show { display: block; }
+  .result-panel .result-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .result-panel .result-status { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .result-status.success { background: #dcfce7; color: #15803d; }
+  .result-status.error { background: #fce4ec; color: #c62828; }
+  .result-detail { font-size: 13px; color: #555; line-height: 1.8; }
+  .result-detail strong { color: #333; }
+  .agent-log {
+    margin-top: 12px; border-top: 1px solid #eee; padding-top: 12px;
+    max-height: 200px; overflow-y: auto;
+  }
+  .agent-log-entry { padding: 6px 0; font-size: 12px; color: #666; border-bottom: 1px solid #f5f5f5; }
+  .agent-log-entry .sender { font-weight: 600; color: #4f8cff; }
+
+  /* ── Activity Log ────────────────────────────────── */
+  .log-container { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .log-empty { padding: 40px; text-align: center; color: #888; font-size: 13px; }
+  .log-entry {
+    padding: 14px 20px; border-bottom: 1px solid #f5f5f5; font-size: 13px;
+    display: grid; grid-template-columns: 120px 100px 1fr; gap: 12px; align-items: start;
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { color: #888; font-size: 12px; font-family: monospace; }
+  .log-type {
+    padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    text-align: center;
+  }
+  .log-type.reserve { background: #dcfce7; color: #15803d; }
+  .log-type.cancel { background: #fef3c7; color: #92400e; }
+  .log-type.release { background: #e0f2fe; color: #0369a1; }
+  .log-type.anomaly { background: #fce4ec; color: #c62828; }
+  .log-detail { color: #555; }
+  .log-detail .highlight { color: #4f8cff; font-weight: 600; }
+
+  /* ── Loading ─────────────────────────────────────── */
+  .loading { text-align: center; padding: 40px; color: #888; }
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid #e5e7eb; border-top-color: #4f8cff;
+    border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toast ───────────────────────────────────────── */
+  .toast-container { position: fixed; top: 20px; right: 20px; z-index: 999; }
+  .toast {
+    padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 500;
+    margin-bottom: 8px; animation: slideIn .3s ease; box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  }
+  .toast.success { background: #22c55e; }
+  .toast.error { background: #ef4444; }
+  .toast.info { background: #4f8cff; }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* ── Responsive ──────────────────────────────────── */
+  @media (max-width: 768px) {
+    .sidebar { width: 60px; }
+    .sidebar-header h1, .sidebar-header p, .nav-item span, .sidebar-footer { display: none; }
+    .nav-item { justify-content: center; padding: 14px; }
+    .main { margin-left: 60px; padding: 16px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .seat-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+    .form-row { grid-template-columns: 1fr; }
+    .log-entry { grid-template-columns: 1fr; gap: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────── -->
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <h1>StudyRoom AI</h1>
+    <p>Multi-Agent Scheduler</p>
+  </div>
+  <div class="nav">
+    <div class="nav-item active" onclick="navigate('dashboard')">
+      <span class="nav-icon">&#9632;</span><span>Dashboard</span>
+    </div>
+    <div class="nav-item" onclick="navigate('seats')">
+      <span class="nav-icon">&#9632;</span><span>Seat Map</span>
+    </div>
+    <div class="nav-item" onclick="navigate('reserve')">
+      <span class="nav-icon">&#9632;</span><span>Reserve</span>
+    </div>
+    <div class="nav-item" onclick="navigate('activity')">
+      <span class="nav-icon">&#9632;</span><span>Activity</span>
+    </div>
+  </div>
+  <div class="sidebar-footer">v1.0 &middot; 4 Agents</div>
+</nav>
+
+<!-- ── Main ─────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- ═══ Dashboard ═══ -->
+  <div id="page-dashboard" class="page active">
+    <h2 class="page-title">Dashboard</h2>
+    <p class="page-subtitle">Real-time overview of the study room system</p>
+    <div class="stats-grid" id="stats-cards">
+      <div class="loading"><div class="spinner"></div>Loading...</div>
+    </div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px">
+      <div class="form-card">
+        <h3 style="font-size:15px; margin-bottom:12px;">Area Utilization</h3>
+        <div id="area-util-chart"></div>
+      </div>
+      <div class="form-card">
+        <h3 style="font-size:15px; margin-bottom:12px;">Quick Actions</h3>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button class="btn btn-primary" onclick="navigate('reserve')">&#43; New Reservation</button>
+          <button class="btn btn-secondary" onclick="navigate('seats')">&#9632; View Seat Map</button>
+          <button class="btn btn-secondary" onclick="refreshDashboard()">&#8635; Refresh</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Seat Map ═══ -->
+  <div id="page-seats" class="page">
+    <h2 class="page-title">Seat Map</h2>
+    <p class="page-subtitle">Click an available seat to reserve it</p>
+    <div id="seat-map-container"><div class="loading"><div class="spinner"></div>Loading seats...</div></div>
+  </div>
+
+  <!-- ═══ Reserve ═══ -->
+  <div id="page-reserve" class="page">
+    <h2 class="page-title">Reserve a Seat</h2>
+    <p class="page-subtitle">Submit a reservation through the multi-agent pipeline</p>
+    <div class="form-card" id="reserve-form-card">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="res-user-id">User ID</label>
+          <input id="res-user-id" type="text" placeholder="e.g. STU2024001" value="STU2024001">
+        </div>
+        <div class="form-group">
+          <label for="res-area">Preferred Area</label>
+          <select id="res-area">
+            <option value="">Auto (let AI decide)</option>
+            <option value="A">A - Quiet Study (2F)</option>
+            <option value="B">B - General Study (3F)</option>
+            <option value="C">C - Discussion (1F)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="res-text">Reservation Request</label>
+        <textarea id="res-text" placeholder="Describe what you need... e.g., I want a quiet window seat for 2 hours">I want a quiet seat in area A for the afternoon</textarea>
+        <div class="hint">Natural language request - the AI agent will parse it</div>
+      </div>
+      <div class="form-group">
+        <label for="res-duration">Duration (minutes)</label>
+        <input id="res-duration" type="range" min="30" max="360" value="120" step="15" oninput="document.getElementById('res-duration-val').textContent=this.value">
+        <div class="hint">Selected: <span id="res-duration-val">120</span> min</div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-primary" id="btn-reserve" onclick="submitReservation()">Submit Reservation</button>
+        <button class="btn btn-danger" id="btn-cancel" onclick="submitCancel()">Cancel Reservation</button>
+        <button class="btn btn-secondary" id="btn-release" onclick="submitRelease()">Release Seat</button>
+      </div>
+    </div>
+    <div class="result-panel" id="reserve-result">
+      <div class="result-header">
+        <span class="result-status" id="result-status-badge">SUCCESS</span>
+        <strong id="result-title">Reservation Completed</strong>
+      </div>
+      <div class="result-detail" id="result-detail"></div>
+      <div class="agent-log" id="result-agent-log"></div>
+    </div>
+  </div>
+
+  <!-- ═══ Activity ═══ -->
+  <div id="page-activity" class="page">
+    <h2 class="page-title">Activity Log</h2>
+    <p class="page-subtitle">Agent pipeline execution history</p>
+    <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+      <button class="btn btn-secondary" onclick="refreshActivity()">&#8635; Refresh</button>
+      <span style="font-size:12px; color:#888;" id="activity-count"></span>
+    </div>
+    <div class="log-container" id="activity-container">
+      <div class="loading"><div class="spinner"></div>Loading activity...</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Toast ────────────────────────────────────────── -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ── JavaScript ───────────────────────────────────── -->
+<script>
+// ── State ────────────────────────────────────────────
+const API = '';
+let seatsData = [];
+let activityData = { executions: [], allocations: [], anomalies: [] };
+
+// ── Navigation ───────────────────────────────────────
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelector(`.nav-item[onclick*="${page}"]`)?.classList.add('active');
+  if (page === 'dashboard') refreshDashboard();
+  if (page === 'seats') renderSeatMap();
+  if (page === 'activity') refreshActivity();
+}
+
+// ── Toast ────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ── API helpers ──────────────────────────────────────
+async function api(path, opts = {}) {
+  const res = await fetch(`${API}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'API error');
+  }
+  return res.json();
+}
+
+// ════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════
+async function refreshDashboard() {
+  const container = document.getElementById('stats-cards');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+  try {
+    const [status, areas] = await Promise.all([api('/api/status'), api('/api/areas')]);
+    const s = status;
+    const cards = [
+      { icon: '&#9632;', label: 'Total Seats', value: s.seats.total_seats, sub: `${s.seats.occupied} occupied` },
+      { icon: '&#9632;', label: 'Utilization', value: `${s.seats.utilization}%`, sub: `${s.seats.available} available` },
+      { icon: '&#9632;', label: 'Success Rate', value: s.execution.success_rate || '0%', sub: `${s.execution.total_executions || 0} executions` },
+      { icon: '&#9632;', label: 'Anomalies', value: s.anomaly.total_anomalies, sub: `${s.anomaly.blacklisted_users} blacklisted` },
+    ];
+    container.innerHTML = cards.map(c => `
+      <div class="stat-card">
+        <div class="icon">${c.icon}</div>
+        <div class="label">${c.label}</div>
+        <div class="value">${c.value}</div>
+        <div class="sub">${c.sub}</div>
+      </div>
+    `).join('');
+
+    // Area utilization chart
+    const chart = document.getElementById('area-util-chart');
+    const areaData = areas.areas || {};
+    chart.innerHTML = Object.entries(areaData).map(([name, info]) => `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+          <span><strong>Area ${name}</strong> <span class="area-tag area-${name}">${getAreaDesc(name)}</span></span>
+          <span>${info.utilization}% full (${info.occupied}/${info.total})</span>
+        </div>
+        <div style="background:#e5e7eb; border-radius:6px; height:8px; overflow:hidden;">
+          <div style="background:${utilColor(info.utilization)}; height:100%; width:${info.utilization}%; border-radius:6px; transition:width .5s;"></div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    container.innerHTML = `<div style="color:#ef4444; padding:20px;">Failed to load: ${e.message}</div>`;
+  }
+}
+
+function getAreaDesc(area) {
+  return { A: 'Quiet', B: 'General', C: 'Discussion' }[area] || '';
+}
+
+function utilColor(pct) {
+  if (pct < 30) return '#22c55e';
+  if (pct < 60) return '#f59e0b';
+  return '#ef4444';
+}
+
+// ════════════════════════════════════════════════════════
+// SEAT MAP
+// ════════════════════════════════════════════════════════
+async function renderSeatMap() {
+  const container = document.getElementById('seat-map-container');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading seats...</div>';
+  try {
+    const data = await api('/api/seats');
+    seatsData = data.seats || [];
+    const areas = {};
+    seatsData.forEach(s => {
+      if (!areas[s.area]) areas[s.area] = [];
+      areas[s.area].push(s);
+    });
+
+    let html = '';
+    for (const [area, seats] of Object.entries(areas)) {
+      const total = seats.length;
+      const occupied = seats.filter(s => s.status !== 'available').length;
+      const util = Math.round(occupied / total * 100);
+      html += `
+        <div class="area-section">
+          <div class="area-header">
+            <h3>Area ${area} <span class="area-tag area-${area}">${getAreaDesc(area)}</span></h3>
+            <span class="area-util">${util}% utilized (${occupied}/${total})</span>
+          </div>
+          <div class="seat-grid">
+            ${seats.map(s => `
+              <div class="seat-card status-${s.status}${s.status === 'available' ? ' onclick="selectSeat(\'' + s.seat_id + '\')"' : ''}"
+                   title="${s.seat_id} - ${s.status}${s.has_power ? ' | Power' : ''}${s.is_window_seat ? ' | Window' : ''}${s.is_quiet_zone ? ' | Quiet' : ''}">
+                <div class="seat-id">${s.seat_id}</div>
+                <div class="seat-status">${s.status}</div>
+                <div class="seat-features">
+                  ${s.has_power ? '&#9889;' : ''}${s.is_window_seat ? ' &#9632;' : ''}${s.is_quiet_zone ? ' &#9632;' : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = `<div style="color:#ef4444; padding:20px;">Failed to load: ${e.message}</div>`;
+  }
+}
+
+function selectSeat(seatId) {
+  // Highlight selected seat
+  document.querySelectorAll('.seat-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.seat-card .seat-id`);
+  // Navigate to reserve and set the request text
+  navigate('reserve');
+  document.getElementById('res-text').value = `I want to reserve seat ${seatId}`;
+  toast(`Seat ${seatId} selected — fill in the form to reserve`, 'info');
+}
+
+// ════════════════════════════════════════════════════════
+// RESERVATION
+// ════════════════════════════════════════════════════════
+async function submitReservation() {
+  const userId = document.getElementById('res-user-id').value.trim();
+  const text = document.getElementById('res-text').value.trim();
+  const area = document.getElementById('res-area').value;
+  const duration = parseInt(document.getElementById('res-duration').value);
+
+  if (!userId) return toast('Please enter a User ID', 'error');
+  if (!text) return toast('Please describe your reservation request', 'error');
+
+  const btn = document.getElementById('btn-reserve');
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+
+  const resultPanel = document.getElementById('reserve-result');
+  resultPanel.classList.remove('show');
+
+  try {
+    const result = await api('/api/reserve', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, request_text: text, preferred_area: area || null, duration_minutes: duration }),
+    });
+
+    displayResult(result, 'reserve');
+    toast(result.status === 'success' ? 'Reservation successful!' : 'Reservation failed', result.status === 'success' ? 'success' : 'error');
+  } catch(e) {
+    toast(`Error: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit Reservation';
+  }
+}
+
+async function submitCancel() {
+  const userId = document.getElementById('res-user-id').value.trim();
+  if (!userId) return toast('Please enter a User ID', 'error');
+  if (!confirm(`Cancel all reservations for ${userId}?`)) return;
+
+  try {
+    const result = await api('/api/cancel', { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+    displayResult(result, 'cancel');
+    toast('Cancellation processed', result.status === 'success' ? 'success' : 'error');
+  } catch(e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+}
+
+async function submitRelease() {
+  const userId = document.getElementById('res-user-id').value.trim();
+  if (!userId) return toast('Please enter a User ID', 'error');
+  if (!confirm(`Release the seat for ${userId}?`)) return;
+
+  try {
+    const result = await api('/api/release', { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+    displayResult(result, 'release');
+    toast('Seat released', result.status === 'success' ? 'success' : 'error');
+  } catch(e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+}
+
+function displayResult(result, action) {
+  const panel = document.getElementById('reserve-result');
+  const badge = document.getElementById('result-status-badge');
+  const title = document.getElementById('result-title');
+  const detail = document.getElementById('result-detail');
+  const agentLog = document.getElementById('result-agent-log');
+
+  const status = result.status || 'unknown';
+  const isSuccess = status === 'success';
+
+  badge.className = `result-status ${isSuccess ? 'success' : 'error'}`;
+  badge.textContent = status.toUpperCase();
+  title.textContent = `${action.charAt(0).toUpperCase() + action.slice(1)} ${isSuccess ? 'Completed' : 'Failed'}`;
+
+  const d = result.detail || {};
+  let detailHtml = '';
+  if (isSuccess) {
+    if (d.reservation) {
+      detailHtml += `<div><strong>Reservation ID:</strong> ${d.reservation.reservation_id || '-'}</div>`;
+    }
+    detailHtml += `<div><strong>Seat:</strong> ${d.seat_id || '-'}</div>`;
+    if (d.execution_time_ms) detailHtml += `<div><strong>Execution Time:</strong> ${d.execution_time_ms}ms</div>`;
+  } else {
+    detailHtml += `<div style="color:#ef4444;"><strong>Reason:</strong> ${d.reason || d.error || 'Unknown'}</div>`;
+    if (d.suggestion) detailHtml += `<div><strong>Suggestion:</strong> ${d.suggestion}</div>`;
+  }
+
+  // Show analysis data
+  const analysis = result.analysis || {};
+  if (analysis.no_show_risk !== undefined) {
+    detailHtml += `<hr style="margin:8px 0; border:none; border-top:1px solid #eee;">`;
+    detailHtml += `<div style="font-weight:600; margin-bottom:4px;">Agent Analysis:</div>`;
+    detailHtml += `<div><strong>No-Show Risk:</strong> ${(analysis.no_show_risk * 100).toFixed(1)}%</div>`;
+    detailHtml += `<div><strong>Priority Score:</strong> ${analysis.priority_score?.toFixed(2) || '-'}</div>`;
+    detailHtml += `<div><strong>Recommended Action:</strong> ${analysis.recommended_action || '-'}</div>`;
+  }
+
+  detail.innerHTML = detailHtml;
+
+  // Agent log
+  const log = result.agent_log || [];
+  if (log.length > 0) {
+    const actionMap = { behavior_agent: 'Behavior Analysis', scheduler_agent: 'Resource Scheduler', executor_agent: 'Task Executor', anomaly_agent: 'Anomaly Detection' };
+    agentLog.innerHTML = '<div style="font-weight:600; font-size:12px; margin-bottom:6px;">Agent Pipeline:</div>' +
+      log.map(e => `<div class="agent-log-entry"><span class="sender">${actionMap[e.sender] || e.sender}</span>: ${e.type}</div>`).join('');
+  } else {
+    agentLog.innerHTML = '';
+  }
+
+  panel.classList.add('show');
+}
+
+// ════════════════════════════════════════════════════════
+// ACTIVITY LOG
+// ════════════════════════════════════════════════════════
+async function refreshActivity() {
+  const container = document.getElementById('activity-container');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading activity...</div>';
+  try {
+    const data = await api('/api/history');
+    activityData = data;
+
+    const all = [];
+    (data.executions || []).forEach(e => {
+      all.push({ time: e.created_at, type: 'reserve', detail: `${e.user_id} → ${e.seat_id} (${e.reservation_id})` });
+    });
+    (data.allocations || []).forEach(a => {
+      if (!all.find(x => x.detail?.includes(a.seat_id))) {
+        all.push({ time: '', type: 'reserve', detail: `Allocated ${a.seat_id} to ${a.user_id} | Score: ${a.allocation_score?.toFixed(2)}` });
+      }
+    });
+    (data.anomalies || []).forEach(a => {
+      all.push({ time: '', type: 'anomaly', detail: `${a.user_id}: ${a.type} (severity: ${a.severity?.toFixed(2)})` });
+    });
+
+    document.getElementById('activity-count').textContent = `${all.length} events`;
+
+    if (all.length === 0) {
+      container.innerHTML = '<div class="log-empty">No activity yet. Make a reservation to see agent pipeline logs.</div>';
+      return;
+    }
+
+    const typeClass = { reserve: 'reserve', cancel: 'cancel', release: 'release', anomaly: 'anomaly' };
+    container.innerHTML = all.reverse().map(e => `
+      <div class="log-entry">
+        <span class="log-time">${e.time ? new Date(e.time).toLocaleTimeString() : '--:--:--'}</span>
+        <span class="log-type ${typeClass[e.type] || ''}">${e.type}</span>
+        <span class="log-detail">${e.detail}</span>
+      </div>
+    `).join('');
+  } catch(e) {
+    container.innerHTML = `<div style="color:#ef4444; padding:20px;">Failed to load: ${e.message}</div>`;
+  }
+}
+
+// ── Auto-refresh dashboard on load ──────────────────
+refreshDashboard();
+renderSeatMap();
+refreshActivity();
+</script>
+</body>
+</html>

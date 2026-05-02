@@ -1,0 +1,14 @@
+# AI Study Room Scheduling Agent
+# Core dependencies (no external APIs required for demo)
+# Python 3.8+
+
+# Optional: for advanced NLP parsing
+# transformers>=4.30.0
+# torch>=2.0.0
+
+# Web server
+fastapi>=0.100.0
+uvicorn>=0.23.0
+
+# Optional: for data visualization
+# matplotlib>=3.7.0
