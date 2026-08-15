@@ -1,8 +1,23 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
-*.log
+*.egg-info/
+
+# Environments
 .env
 venv/
 .venv/
+.venv-check/
+
+# Logs
+*.log
+
+# Tooling / IDE
 .claude/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
