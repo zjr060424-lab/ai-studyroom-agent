@@ -10,7 +10,6 @@ class BaseAgent(ABC):
         self.description = description
         self.message_queue: List[Message] = []
         self.memory: dict = {}
-        self.running = False
 
     @abstractmethod
     def process(self, message: Message) -> Optional[Message]:

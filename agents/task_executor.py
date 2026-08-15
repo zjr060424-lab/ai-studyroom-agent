@@ -160,7 +160,10 @@ class APISimulator:
     """Simulates external API calls for the execution agent."""
 
     def check_availability(self, seat_id: str) -> bool:
-        return random.random() > 0.1  # 90% availability
+        # The scheduler is the single source of truth for seat state in
+        # this in-memory demo, so a seat it just allocated is always
+        # available here. A real booking backend would be queried instead.
+        return True
 
     def create_reservation(self, user_id: str, seat_id: str, decision: dict) -> dict:
         return {

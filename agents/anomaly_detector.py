@@ -34,6 +34,21 @@ class AnomalyDetectorAgent(BaseAgent):
             return self._inspect_message(message)
         return None
 
+    def tick(self) -> Optional[Message]:
+        """Drain the whole queue each cycle.
+
+        Unlike worker agents that handle one task per cycle, the observer
+        may receive several mirrored messages per cycle and must not fall
+        behind. Returns the most recent alert raised, if any.
+        """
+        alert = None
+        while self.message_queue:
+            msg = self.message_queue.pop(0)
+            result = self.process(msg)
+            if result:
+                alert = result
+        return alert
+
     def _inspect_message(self, message: Message) -> Optional[Message]:
         content = message.content
         analysis = content.get("analysis") or content
@@ -63,7 +78,7 @@ class AnomalyDetectorAgent(BaseAgent):
                 msg_id=f"anomaly-{message.msg_id}",
                 msg_type=MessageType.ANOMALY_ALERT,
                 sender=self.agent_id,
-                recipient="scheduler_agent",
+                recipient="user",
                 content={
                     "user_id": user_id,
                     "anomalies": alerts,

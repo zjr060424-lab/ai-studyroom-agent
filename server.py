@@ -1,13 +1,12 @@
 """FastAPI web server for AI Study Room Scheduling Agent."""
 
-import json
 import logging
-import random
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -34,7 +33,7 @@ class ReleaseRequest(BaseModel):
 
 # ── Global orchestrator ──────────────────────────────────────────
 
-orchestrator: Orchestrator = None
+orchestrator: Optional[Orchestrator] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -126,12 +125,11 @@ def reserve(req: ReserveRequest):
     if not req.user_id or not req.request_text:
         raise HTTPException(400, "user_id and request_text are required")
 
-    # Build a request that includes area preference
-    request_text = req.request_text
-    if req.preferred_area:
-        request_text = f"{request_text} (prefer area {req.preferred_area})"
-
-    responses = orchestrator.run_cycle(request_text)
+    responses = orchestrator.run_cycle(req.request_text, meta={
+        "user_id": req.user_id,
+        "preferred_area": req.preferred_area,
+        "duration_minutes": req.duration_minutes,
+    })
 
     # Find the execution result and analysis details
     result = {"status": "unknown", "detail": {}, "agent_log": []}
@@ -160,7 +158,8 @@ def cancel(req: CancelRequest):
     """Cancel a reservation."""
     if not req.user_id:
         raise HTTPException(400, "user_id is required")
-    responses = orchestrator.run_cycle(f"cancel {req.user_id}")
+    responses = orchestrator.run_cycle("cancel my reservation",
+                                       meta={"user_id": req.user_id})
     result = {"status": "unknown", "detail": {}, "agent_log": []}
     for resp in responses:
         entry = {"sender": resp.sender, "type": resp.msg_type.value, "content": resp.content}
@@ -175,7 +174,8 @@ def release(req: ReleaseRequest):
     """Release a seat."""
     if not req.user_id:
         raise HTTPException(400, "user_id is required")
-    responses = orchestrator.run_cycle(f"release {req.user_id}")
+    responses = orchestrator.run_cycle("release my seat",
+                                       meta={"user_id": req.user_id})
     result = {"status": "unknown", "detail": {}, "agent_log": []}
     for resp in responses:
         entry = {"sender": resp.sender, "type": resp.msg_type.value, "content": resp.content}
@@ -201,9 +201,8 @@ def get_history():
 @app.get("/")
 def index():
     """Serve the main frontend page."""
-    from fastapi.responses import FileResponse
     return FileResponse("static/index.html")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("server:app", host="127.0.0.1", port=8000, reload=True)

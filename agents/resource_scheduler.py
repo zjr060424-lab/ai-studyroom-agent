@@ -22,7 +22,6 @@ class ResourceSchedulerAgent(BaseAgent):
         )
         self.seats: List[Seat] = self._initialize_seats()
         self.allocation_history: List[dict] = []
-        self.utilization_cache: dict = {}
 
     def _initialize_seats(self, count: int = 30) -> List[Seat]:
         """Initialize study room seats with varied configurations."""
@@ -77,12 +76,32 @@ class ResourceSchedulerAgent(BaseAgent):
             )
 
         if intent == "cancel":
+            # Cancelling a reservation also frees the seat it holds.
+            released = self._handle_release(user_id)
             return Message(
                 msg_id=f"sched-can-{message.msg_id}",
                 msg_type=MessageType.SCHEDULE_DECISION,
                 sender=self.agent_id,
                 recipient="executor_agent",
-                content={"action": "cancel", "user_id": user_id},
+                content={"action": "cancel", "user_id": user_id,
+                         "seat_released": released},
+            )
+
+        # Conflict guard: one active seat per user. A user who already
+        # holds a seat must release or cancel it before reserving again.
+        existing = next((s for s in self.seats if s.current_user_id == user_id), None)
+        if existing:
+            self.log(f"Rejected: {user_id} already holds seat {existing.seat_id}", "WARNING")
+            return Message(
+                msg_id=f"sched-dup-{message.msg_id}",
+                msg_type=MessageType.FEEDBACK,
+                sender=self.agent_id,
+                recipient="user",
+                content={
+                    "error": "duplicate_reservation",
+                    "existing_seat": existing.seat_id,
+                    "suggestion": "Release or cancel your current seat before reserving a new one.",
+                },
             )
 
         # Find best seat using multi-factor scoring
@@ -200,13 +219,14 @@ class ResourceSchedulerAgent(BaseAgent):
         }
 
     def _handle_release(self, user_id: str) -> bool:
-        """Release a seat occupied by the given user."""
+        """Release all seats occupied by the given user."""
+        released = False
         for seat in self.seats:
             if seat.current_user_id == user_id:
                 seat.release()
                 self.log(f"Released seat {seat.seat_id} from user {user_id}")
-                return True
-        return False
+                released = True
+        return released
 
     def _no_seat_response(self, message: Message) -> Message:
         return Message(

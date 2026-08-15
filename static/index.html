@@ -434,7 +434,8 @@ async function renderSeatMap() {
           </div>
           <div class="seat-grid">
             ${seats.map(s => `
-              <div class="seat-card status-${s.status}${s.status === 'available' ? ' onclick="selectSeat(\'' + s.seat_id + '\')"' : ''}"
+              <div class="seat-card status-${s.status}"
+                   ${s.status === 'available' ? `onclick="selectSeat('${s.seat_id}')"` : ''}
                    title="${s.seat_id} - ${s.status}${s.has_power ? ' | Power' : ''}${s.is_window_seat ? ' | Window' : ''}${s.is_quiet_zone ? ' | Quiet' : ''}">
                 <div class="seat-id">${s.seat_id}</div>
                 <div class="seat-status">${s.status}</div>
@@ -454,10 +455,7 @@ async function renderSeatMap() {
 }
 
 function selectSeat(seatId) {
-  // Highlight selected seat
-  document.querySelectorAll('.seat-card').forEach(c => c.classList.remove('selected'));
-  const card = document.querySelector(`.seat-card .seat-id`);
-  // Navigate to reserve and set the request text
+  // Navigate to reserve and pre-fill the request text
   navigate('reserve');
   document.getElementById('res-text').value = `I want to reserve seat ${seatId}`;
   toast(`Seat ${seatId} selected — fill in the form to reserve`, 'info');

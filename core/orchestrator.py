@@ -1,7 +1,11 @@
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional
 from datetime import datetime
 from core.message import Message, MessageType
 from core.agent_base import BaseAgent
+
+# Message types that the anomaly detector passively observes.
+MONITORED_TYPES = (MessageType.ANALYSIS_RESULT, MessageType.SCHEDULE_DECISION)
+OBSERVER_AGENT_ID = "anomaly_agent"
 
 
 class Orchestrator:
@@ -33,19 +37,38 @@ class Orchestrator:
         else:
             self.log(f"No agent found with id: {message.recipient}", "WARNING")
 
-    def run_cycle(self, user_request: Optional[str] = None) -> List[Message]:
-        """Run one full processing cycle through all agents."""
+        # Mirror pipeline traffic to the anomaly detector so it can monitor
+        # user activity patterns without being a direct recipient.
+        observer = self.agents.get(OBSERVER_AGENT_ID)
+        if (observer
+                and message.msg_type in MONITORED_TYPES
+                and message.sender != OBSERVER_AGENT_ID
+                and message.recipient != OBSERVER_AGENT_ID):
+            observer.receive(message)
+
+    def run_cycle(self, user_request: Optional[str] = None,
+                  meta: Optional[dict] = None) -> List[Message]:
+        """Run one full processing cycle through all agents.
+
+        Args:
+            user_request: Raw natural-language request text.
+            meta: Optional structured fields (e.g. user_id, duration_minutes,
+                preferred_area) that override values parsed from the text.
+        """
         self.step_count += 1
         responses = []
 
         if user_request:
             self.log(f"User Request: {user_request}")
+            content = {"raw_request": user_request}
+            if meta:
+                content.update({k: v for k, v in meta.items() if v is not None})
             msg = Message(
                 msg_id=f"req-{self.step_count}",
                 msg_type=MessageType.REQUEST,
                 sender="user",
                 recipient="behavior_agent",
-                content={"raw_request": user_request},
+                content=content,
             )
             self.send_message(msg)
 

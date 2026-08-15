@@ -1,5 +1,5 @@
 import random
-from datetime import datetime
+import re
 from typing import Optional
 from core.agent_base import BaseAgent
 from core.message import Message, MessageType
@@ -28,6 +28,12 @@ class UserBehaviorAgent(BaseAgent):
     def _handle_request(self, message: Message) -> Message:
         raw = message.content.get("raw_request", "")
         parsed = self._parse_request(raw)
+
+        # Structured fields supplied alongside the request (e.g. from the
+        # web API) take precedence over values parsed from free text.
+        for key in ("user_id", "duration_minutes", "preferred_area"):
+            if message.content.get(key) is not None:
+                parsed[key] = message.content[key]
 
         user_id = parsed.get("user_id", "unknown")
         user_profile = self._get_or_create_profile(user_id)
@@ -63,21 +69,21 @@ class UserBehaviorAgent(BaseAgent):
         """Parse natural language request to extract intent and parameters."""
         raw_lower = raw.lower()
         intent = "reserve"
-        if "取消" in raw or "cancel" in raw:
+        if "取消" in raw or "cancel" in raw_lower:
             intent = "cancel"
-        elif "release" in raw or "释放" in raw or "离开" in raw:
+        elif "release" in raw_lower or "释放" in raw or "离开" in raw:
             intent = "release"
 
-        # Extract time information
-        time_slot = "afternoon"
-        if "明天" in raw or "tomorrow" in raw:
-            time_slot = "tomorrow_afternoon"
-        if "下午" in raw or "afternoon" in raw:
-            time_slot = "afternoon"
-        elif "上午" in raw or "morning" in raw:
-            time_slot = "morning"
-        elif "晚上" in raw or "evening" in raw:
-            time_slot = "evening"
+        # Extract time information (period of day, optionally prefixed
+        # with "tomorrow" so that e.g. 明天下午 -> tomorrow_afternoon)
+        period = "afternoon"
+        if "上午" in raw or "morning" in raw_lower:
+            period = "morning"
+        elif "晚上" in raw or "evening" in raw_lower:
+            period = "evening"
+        time_slot = period
+        if "明天" in raw or "tomorrow" in raw_lower:
+            time_slot = f"tomorrow_{period}"
 
         return {
             "intent": intent,
@@ -89,12 +95,23 @@ class UserBehaviorAgent(BaseAgent):
         }
 
     def _extract_user_id(self, raw: str) -> str:
-        """Simulate user ID extraction from request."""
+        """Extract a student ID from the request text.
+
+        Falls back to a randomly generated ID to simulate an
+        authenticated session when the text carries no explicit ID.
+        """
+        match = re.search(r"\b(STU\d+)\b", raw, re.IGNORECASE)
+        if match:
+            return match.group(1).upper()
         return f"STU{random.randint(2024001, 2024100)}"
 
     def _extract_area(self, raw: str) -> str:
         """Extract preferred study area from request."""
         raw_lower = raw.lower()
+        match = re.search(r"area\s*([abc])\b|([abc])区|\b([abc])-\d{1,3}\b",
+                          raw, re.IGNORECASE)
+        if match:
+            return next(g for g in match.groups() if g).upper()
         if "quiet" in raw_lower or "安静" in raw_lower:
             return "A"
         if "discuss" in raw_lower or "讨论" in raw_lower or "小组" in raw_lower:

@@ -4,9 +4,7 @@ AI Study Room Scheduling Agent
 Multi-agent system for intelligent study room reservation and resource scheduling.
 """
 
-import sys
 import time
-import random
 from datetime import datetime
 
 from core.orchestrator import Orchestrator
@@ -25,12 +23,14 @@ DEMO_REQUESTS = [
     "[User] 预订讨论区的座位，我们小组有4个人",
 ]
 
+# One user (STU2024099) firing requests in rapid succession — the
+# anomaly detector aggregates activity per user to catch this pattern.
 ANOMALOUS_REQUESTS = [
-    "[User] 预约座位",
-    "[User] 预约座位B区",
-    "[User] 再预约一个C区的",
-    "[User] 取消刚才的再预约A区",
-    "[User] 再试一次预约",
+    "[User STU2024099] 预约座位",
+    "[User STU2024099] 预约座位B区",
+    "[User STU2024099] 再预约一个C区的",
+    "[User STU2024099] 取消刚才的再预约A区",
+    "[User STU2024099] 再试一次预约",
 ]
 
 
@@ -50,9 +50,9 @@ def print_separator():
 
 def simulate_user_request(orchestrator: Orchestrator, request: str, delay: float = 0.3):
     """Simulate a user request and show the full agent pipeline."""
-    print(f"\n  +--- User Request " + "-" * 32)
+    print("\n  +--- User Request " + "-" * 32)
     print(f"  |  {request}")
-    print(f"  +" + "-" * 44)
+    print("  +" + "-" * 44)
 
     responses = orchestrator.run_cycle(request)
     time.sleep(delay)
