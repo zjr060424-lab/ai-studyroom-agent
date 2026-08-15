@@ -1,0 +1,233 @@
+  +====================================================+
+  |     AI Study Room Scheduling Agent                 |
+  |     Multi-Agent Intelligent Resource Scheduler      |
+  +====================================================+
+    
+  [System] Initializing Multi-Agent System...
+
+  [Orchestrator] Agent registered: User Behavior Analysis Agent (behavior_agent)
+  [Orchestrator] Agent registered: Resource Scheduling Agent (scheduler_agent)
+  [Orchestrator] Agent registered: Anomaly Detection Agent (anomaly_agent)
+  [Orchestrator] Agent registered: Task Execution Agent (executor_agent)
+
+  [System] All agents initialized. Ready to process requests.
+
+  [System] Time: 2026-08-15 10:54:39
+
+  --------------------------------------------------
+
+  Phase 1: Normal Reservation Flow
+  ==========================================
+
+
+  +--- User Request --------------------------------
+  |  [User] 我想预约明天下午3点图书馆A区的座位
+  +--------------------------------------------
+  [Orchestrator] User Request: [User] 我想预约明天下午3点图书馆A区的座位
+  [behavior_agent] [INFO] Parsed request: reserve | User: STU2024082
+  [behavior_agent] [INFO] No-show risk prediction: 35.3%
+  [behavior_agent] [INFO] Assigned priority: 0.59
+  [scheduler_agent] [INFO] Processing allocation for STU2024082 | Risk: 35.3% | Priority: 0.59
+  [scheduler_agent] [INFO] Allocated seat: A-10 (Area A) | Score: 0.95
+  [executor_agent] [INFO] Executing action: reserve
+  [executor_agent] [INFO] [API] Checking availability: A-10 ...
+  [executor_agent] [INFO] [API] Creating reservation: STU2024082 -> A-10 ...
+  [executor_agent] [INFO] [API] [OK] Reservation confirmed: RSV-20260815-2023
+  [executor_agent] [INFO] [API] Notification sent to STU2024082: reservation confirmed
+
+  >> Final Result [Task Execution Agent]:
+     Status: [SUCCESS]
+     Reservation ID: RSV-20260815-2023
+     Seat: A-10
+     Execution time: 171ms
+
+  --------------------------------------------------
+
+
+  +--- User Request --------------------------------
+  |  [User] 预约明天下午安静学习区的座位
+  +--------------------------------------------
+  [Orchestrator] User Request: [User] 预约明天下午安静学习区的座位
+  [behavior_agent] [INFO] Parsed request: reserve | User: STU2024017
+  [behavior_agent] [INFO] No-show risk prediction: 27.3%
+  [behavior_agent] [INFO] Assigned priority: 0.66
+  [scheduler_agent] [INFO] Processing allocation for STU2024017 | Risk: 27.3% | Priority: 0.66
+  [scheduler_agent] [INFO] Allocated seat: A-21 (Area A) | Score: 0.95
+  [executor_agent] [INFO] Executing action: reserve
+  [executor_agent] [INFO] [API] Checking availability: A-21 ...
+  [executor_agent] [INFO] [API] Creating reservation: STU2024017 -> A-21 ...
+  [executor_agent] [INFO] [API] [OK] Reservation confirmed: RSV-20260815-9197
+  [executor_agent] [INFO] [API] Notification sent to STU2024017: reservation confirmed
+
+  >> Final Result [Task Execution Agent]:
+     Status: [SUCCESS]
+     Reservation ID: RSV-20260815-9197
+     Seat: A-21
+     Execution time: 383ms
+
+  --------------------------------------------------
+
+
+  +--- User Request --------------------------------
+  |  [User] cancel my reservation for today
+  +--------------------------------------------
+  [Orchestrator] User Request: [User] cancel my reservation for today
+  [behavior_agent] [INFO] Parsed request: cancel | User: STU2024014
+  [behavior_agent] [INFO] No-show risk prediction: 5.0%
+  [behavior_agent] [INFO] Assigned priority: 0.58
+  [scheduler_agent] [INFO] Processing allocation for STU2024014 | Risk: 5.0% | Priority: 0.58
+  [executor_agent] [INFO] Executing action: cancel
+  [executor_agent] [INFO] [API] Processing cancellation for: STU2024014 ...
+  [executor_agent] [INFO] [API] Cancellation confirmed
+  [executor_agent] [INFO] [API] Notification sent to STU2024014: reservation cancelled
+
+  >> Final Result [Task Execution Agent]:
+     Status: [SUCCESS] CANCEL completed
+
+  --------------------------------------------------
+
+  Phase 2: System Status After Normal Operations
+  ==========================================
+
+  Resource Status:
+     Total Seats: 30
+     Occupied: 2
+     Available: 28
+     Utilization: 6.7%
+
+  Execution Status:
+     Total Executions: 2
+     Success Rate: 100.0%
+     Failures: 0
+
+  --------------------------------------------------
+
+  Phase 3: Anomalous Behavior Detection
+  ==========================================
+
+
+  +--- User Request --------------------------------
+  |  [User STU2024099] 预约座位
+  +--------------------------------------------
+  [Orchestrator] User Request: [User STU2024099] 预约座位
+  [behavior_agent] [INFO] Parsed request: reserve | User: STU2024099
+  [behavior_agent] [INFO] No-show risk prediction: 29.8%
+  [behavior_agent] [INFO] Assigned priority: 0.56
+  [scheduler_agent] [INFO] Processing allocation for STU2024099 | Risk: 29.8% | Priority: 0.56
+  [scheduler_agent] [INFO] Allocated seat: A-24 (Area A) | Score: 0.95
+  [executor_agent] [INFO] Executing action: reserve
+  [executor_agent] [INFO] [API] Checking availability: A-24 ...
+  [executor_agent] [INFO] [API] Creating reservation: STU2024099 -> A-24 ...
+  [executor_agent] [INFO] [API] [OK] Reservation confirmed: RSV-20260815-1916
+  [executor_agent] [INFO] [API] Notification sent to STU2024099: reservation confirmed
+
+  >> Final Result [Task Execution Agent]:
+     Status: [SUCCESS]
+     Reservation ID: RSV-20260815-1916
+     Seat: A-24
+     Execution time: 342ms
+
+  --------------------------------------------------
+
+
+  +--- User Request --------------------------------
+  |  [User STU2024099] 预约座位B区
+  +--------------------------------------------
+  [Orchestrator] User Request: [User STU2024099] 预约座位B区
+  [behavior_agent] [INFO] Parsed request: reserve | User: STU2024099
+  [behavior_agent] [INFO] No-show risk prediction: 29.8%
+  [behavior_agent] [INFO] Assigned priority: 0.56
+  [scheduler_agent] [INFO] Processing allocation for STU2024099 | Risk: 29.8% | Priority: 0.56
+  [scheduler_agent] [WARNING] Rejected: STU2024099 already holds seat A-24
+
+  [!] System Feedback: duplicate_reservation
+     Suggestion: Release or cancel your current seat before reserving a new one.
+
+  --------------------------------------------------
+
+
+  +--- User Request --------------------------------
+  |  [User STU2024099] 再预约一个C区的
+  +--------------------------------------------
+  [Orchestrator] User Request: [User STU2024099] 再预约一个C区的
+  [behavior_agent] [INFO] Parsed request: reserve | User: STU2024099
+  [behavior_agent] [INFO] No-show risk prediction: 29.8%
+  [behavior_agent] [INFO] Assigned priority: 0.56
+  [scheduler_agent] [INFO] Processing allocation for STU2024099 | Risk: 29.8% | Priority: 0.56
+  [scheduler_agent] [WARNING] Rejected: STU2024099 already holds seat A-24
+
+  [!] System Feedback: duplicate_reservation
+     Suggestion: Release or cancel your current seat before reserving a new one.
+
+  --------------------------------------------------
+
+
+  +--- User Request --------------------------------
+  |  [User STU2024099] 取消刚才的再预约A区
+  +--------------------------------------------
+  [Orchestrator] User Request: [User STU2024099] 取消刚才的再预约A区
+  [behavior_agent] [INFO] Parsed request: cancel | User: STU2024099
+  [behavior_agent] [INFO] No-show risk prediction: 29.8%
+  [behavior_agent] [INFO] Assigned priority: 0.56
+  [anomaly_agent] [INFO] [ALERT] Anomaly detected: rapid_fire_reservations for STU2024099 | Score: 0.75
+  [scheduler_agent] [INFO] Processing allocation for STU2024099 | Risk: 29.8% | Priority: 0.56
+  [scheduler_agent] [INFO] Released seat A-24 from user STU2024099
+  [executor_agent] [INFO] Executing action: cancel
+  [executor_agent] [INFO] [API] Processing cancellation for: STU2024099 ...
+  [executor_agent] [INFO] [API] Cancellation confirmed
+  [executor_agent] [INFO] [API] Notification sent to STU2024099: reservation cancelled
+
+  [!] Anomaly Alert [Anomaly Detection Agent]:
+     - Type: rapid_fire_reservations
+       Severity: 0.75
+       Detail: Multiple reservation attempts in short time window
+
+  >> Final Result [Task Execution Agent]:
+     Status: [SUCCESS] CANCEL completed
+
+  --------------------------------------------------
+
+
+  +--- User Request --------------------------------
+  |  [User STU2024099] 再试一次预约
+  +--------------------------------------------
+  [Orchestrator] User Request: [User STU2024099] 再试一次预约
+  [behavior_agent] [INFO] Parsed request: reserve | User: STU2024099
+  [behavior_agent] [INFO] No-show risk prediction: 29.8%
+  [behavior_agent] [INFO] Assigned priority: 0.56
+  [anomaly_agent] [INFO] [ALERT] Anomaly detected: rapid_fire_reservations for STU2024099 | Score: 0.75
+  [anomaly_agent] [INFO] [ALERT] Anomaly detected: rapid_fire_reservations for STU2024099 | Score: 0.75
+  [scheduler_agent] [INFO] Processing allocation for STU2024099 | Risk: 29.8% | Priority: 0.56
+  [scheduler_agent] [INFO] Allocated seat: B-13 (Area B) | Score: 0.85
+  [executor_agent] [INFO] Executing action: reserve
+  [executor_agent] [INFO] [API] Checking availability: B-13 ...
+  [executor_agent] [INFO] [API] Creating reservation: STU2024099 -> B-13 ...
+  [executor_agent] [INFO] [API] [OK] Reservation confirmed: RSV-20260815-8234
+  [executor_agent] [INFO] [API] Notification sent to STU2024099: reservation confirmed
+
+  [!] Anomaly Alert [Anomaly Detection Agent]:
+     - Type: rapid_fire_reservations
+       Severity: 0.75
+       Detail: Multiple reservation attempts in short time window
+
+  >> Final Result [Task Execution Agent]:
+     Status: [SUCCESS]
+     Reservation ID: RSV-20260815-8234
+     Seat: B-13
+     Execution time: 242ms
+
+  --------------------------------------------------
+
+  Phase 4: Final System Report
+  ==========================================
+
+  Anomaly Detection Report:
+     Total Anomalies Detected: 3
+     Blacklisted Users: 0
+     Active Monitoring: 4 users
+
+  Final Resource Utilization: 10.0%
+
+  [System] Demo Complete. Total cycles: 8
+  [System] Thank you for using AI Study Room Scheduling Agent!
+
